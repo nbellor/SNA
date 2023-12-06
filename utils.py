@@ -1,6 +1,8 @@
 
 import torch
 import dgl
+from torch.utils.data import Dataset
+
 
 from dgl.data import CoraGraphDataset, PubmedGraphDataset, WisconsinDataset, TexasDataset
 
@@ -32,25 +34,27 @@ def get_dataset(dataset):
     
     if dataset in {"pubmed", "cora", "wisconsin", "texas"}:
 
-        file_path = "data/" + dataset + ".pt"
+        file_path = "data/" + dataset
 
         if dataset == "pubmed":
-            graph = PubmedGraphDataset("data/" + dataset)[0]
+            graph = PubmedGraphDataset(file_path)[0]
         elif dataset == "cora":
-            graph = CoraGraphDataset("data/" + dataset)[0]
+            graph = CoraGraphDataset(file_path)[0]
         elif dataset == "wisconsin":
-            graph = WisconsinDataset("data/" + dataset)[0]
+            graph = WisconsinDataset(file_path)[0]
         elif dataset == "texas":
-            graph = TexasDataset("data/" + dataset)[0]
+            graph = TexasDataset(file_path)[0]
 
-        adj = data_list[0]
-        features = data_list[1]
+        features = graph.ndata['feat']
         labels = graph.ndata['label']
 
-        idx_train = graph.ndata['train_mask']
-        idx_val = graph.ndata['val_mask']
-        idx_test = graph.ndata['test_mask']
+        idx_train = graph.ndata['train_mask'] if dataset in {"cora", "pubmed"} else graph.ndata['train_mask'][:,0]
+        idx_val = graph.ndata['val_mask'] if dataset in {"cora", "pubmed"} else graph.ndata['val_mask'][:,0]
+        idx_test = graph.ndata['test_mask'] if dataset in {"cora", "pubmed"} else graph.ndata['val_mask'][:,0]
 
         graph = dgl.to_bidirected(graph)
+        adj = graph.adjacency_matrix()
+        adj = torch.sparse_coo_tensor(adj.indices(), adj.val, adj.shape)
+        adj = adj.to_sparse_csr()
 
-    return adj, features, labels, idx_train, idx_val, idx_test
+    return graph, adj, features, labels, idx_train, idx_val, idx_test
